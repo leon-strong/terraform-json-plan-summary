@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+# vim: set ft=python ts=2 sw=2 et:
+import json, sys, re
+## Simple script to nicely Cize the output of a tf plan with a summary of what's changing
+## or being modified.
+C = {
+  "CREATE"   : "\033[94m",
+  "UPDATE"   : "\033[38;5;209m",
+  "DELETE"   : "\033[38;5;196m",
+  "RESOURCE" : "\033[38;5;156m",
+  "RESET"     : "\033[0m",
+  "WHITE"    : "\033[37m",
+  "MODULE"   : "\033[38;5;159m"
+}
+
+def C_match(item,color):
+  result = item.group()
+  str = f"{color}{result}{C['RESET']}"
+  return str
+
+def print_items(item):
+  item = re.sub(r'(aws([a-zA-Z_][a-zA-Z_0-9]*))', lambda match :C_match(match, C["RESOURCE"]), item)
+  item = re.sub(r'(module.([a-zA-Z_][a-zA-Z_0-9]*))', lambda match :C_match(match, C["MODULE"]), item)
+  print(" ",item)
+
+def main():
+  grouped_changes = {}
+  data = json.load(sys.stdin)
+  pending_changes = data["resource_changes"]
+  print()
+  for item in pending_changes:
+    action = item["change"]["actions"][0]
+    if action not in grouped_changes:
+      grouped_changes[action] = []
+    grouped_changes[action].append(item["address"])
+  # Creates 
+  if 'create' in grouped_changes.keys(): 
+    print(f"{C['CREATE']}Creating Resources{C['WHITE']}:{C['RESET']}")
+    for item in grouped_changes['create']:
+      print_items(item)
+  # Updates 
+  if 'update' in grouped_changes.keys(): 
+    print(f"{C['UPDATE']}Updating Resources{C['WHITE']}:{C['RESET']}")  
+    for item in grouped_changes['update']:
+      print_items(item)
+  # deletes
+  if 'delete' in grouped_changes.keys():
+    print(f"{C['DELETE']}Removing Resources{C['WHITE']}:{C['RESET']}")
+  for item in grouped_changes['delete']:
+    print_items(item)
+
+main()
